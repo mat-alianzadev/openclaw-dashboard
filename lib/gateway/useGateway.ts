@@ -96,3 +96,79 @@ export function useGateway(options: UseGatewayOptions = {}) {
     isConnected: status === 'connected'
   }
 }
+
+// Hook for agent status updates
+export function useAgentStatus() {
+  const [agents, setAgents] = useState<Record<string, { status: string; lastActivity: Date }>>({})
+  
+  const { isConnected } = useGateway({
+    onMessage: (message) => {
+      if (message.type === 'agent_status' && message.agentId) {
+        setAgents(prev => ({
+          ...prev,
+          [message.agentId!]: {
+            status: (message.data as { status: string }).status || 'unknown',
+            lastActivity: new Date()
+          }
+        }))
+      }
+    }
+  })
+
+  return { agents, isConnected }
+}
+
+// Hook for chat messages
+export function useChat(agentId: string) {
+  const [messages, setMessages] = useState<Array<{
+    id: string
+    role: 'user' | 'assistant'
+    content: string
+    timestamp: Date
+  }>>([])
+  const [isLoading, setIsLoading] = useState(false)
+
+  const { sendMessage, isConnected } = useGateway({
+    onMessage: (message) => {
+      if (message.type === 'chat' && message.agentId === agentId) {
+        setMessages(prev => [...prev, {
+          id: Date.now().toString(),
+          role: 'assistant',
+          content: (message.data as { content: string }).content,
+          timestamp: new Date()
+        }])
+        setIsLoading(false)
+      }
+    }
+  })
+
+  const sendChatMessage = useCallback(async (content: string) => {
+    if (!isConnected) {
+      throw new Error('Not connected to Gateway')
+    }
+
+    // Add user message
+    const userMessage = {
+      id: Date.now().toString(),
+      role: 'user' as const,
+      content,
+      timestamp: new Date()
+    }
+    setMessages(prev => [...prev, userMessage])
+    setIsLoading(true)
+
+    // Send to Gateway
+    sendMessage({
+      type: 'chat',
+      agentId,
+      content
+    })
+  }, [agentId, isConnected, sendMessage])
+
+  return {
+    messages,
+    isLoading,
+    isConnected,
+    sendChatMessage
+  }
+}

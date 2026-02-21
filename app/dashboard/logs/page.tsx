@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect, useRef } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
@@ -13,28 +13,78 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { Search, Download, Trash2 } from "lucide-react"
+import { Search, Download, Trash2, Loader2 } from "lucide-react"
 import { formatDate } from "@/lib/utils"
+import { useGateway } from "@/lib/gateway/useGateway"
+import { Skeleton } from "@/components/ui/skeleton"
 
-const mockLogs = [
-  { id: "1", timestamp: new Date(), level: "info", agentId: "dev", message: "Starting code review for dashboard components" },
-  { id: "2", timestamp: new Date(Date.now() - 60000), level: "debug", agentId: "dev", message: "Found 3 components to review" },
-  { id: "3", timestamp: new Date(Date.now() - 120000), level: "info", agentId: "admin", message: "Connecting to server 192.168.1.75" },
-  { id: "4", timestamp: new Date(Date.now() - 180000), level: "warn", agentId: "admin", message: "Container dokploy-traefik needs restart" },
-  { id: "5", timestamp: new Date(Date.now() - 240000), level: "info", agentId: "admin", message: "Container restarted successfully" },
-  { id: "6", timestamp: new Date(Date.now() - 300000), level: "info", agentId: "main", message: "Installing skill react-best-practices" },
-  { id: "7", timestamp: new Date(Date.now() - 360000), level: "debug", agentId: "main", message: "Downloaded 59 rule files" },
-  { id: "8", timestamp: new Date(Date.now() - 420000), level: "info", agentId: "main", message: "Skill installed successfully" },
-  { id: "9", timestamp: new Date(Date.now() - 480000), level: "error", agentId: "reportes", message: "Failed to generate PDF: template not found" },
-  { id: "10", timestamp: new Date(Date.now() - 540000), level: "info", agentId: "reportes", message: "Retrying with default template" },
-]
+interface LogEntry {
+  id: string
+  timestamp: string
+  level: 'debug' | 'info' | 'warn' | 'error'
+  agentId?: string
+  message: string
+}
+
+interface Agent {
+  id: string
+  name: string
+  emoji: string
+}
 
 export default function LogsPage() {
+  const [logs, setLogs] = useState<LogEntry[]>([])
+  const [agents, setAgents] = useState<Agent[]>([])
+  const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState("")
   const [levelFilter, setLevelFilter] = useState<string>("all")
   const [agentFilter, setAgentFilter] = useState<string>("all")
+  const scrollRef = useRef<HTMLDivElement>(null)
+  
+  const { status: gatewayStatus } = useGateway({
+    onMessage: (message) => {
+      if (message.type === 'log') {
+        const logEntry = message.data as LogEntry
+        setLogs(prev => [logEntry, ...prev].slice(0, 1000)) // Keep last 1000 logs
+      }
+    }
+  })
 
-  const filteredLogs = mockLogs.filter((log) => {
+  // Fetch initial logs and agents
+  useEffect(() => {
+    async function fetchData() {
+      try {
+        // Fetch agents
+        const agentsRes = await fetch('/api/agents')
+        if (agentsRes.ok) {
+          const agentsData = await agentsRes.json()
+          setAgents(agentsData)
+        }
+
+        // Fetch logs
+        const logsRes = await fetch('/api/logs?limit=100')
+        if (logsRes.ok) {
+          const logsData = await logsRes.json()
+          setLogs(logsData)
+        }
+      } catch (err) {
+        console.error('Failed to fetch data:', err)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchData()
+  }, [])
+
+  // Auto-scroll to bottom for new logs
+  useEffect(() => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = 0
+    }
+  }, [logs])
+
+  const filteredLogs = logs.filter((log) => {
     const matchesSearch = log.message.toLowerCase().includes(search.toLowerCase())
     const matchesLevel = levelFilter === "all" || log.level === levelFilter
     const matchesAgent = agentFilter === "all" || log.agentId === agentFilter
@@ -49,6 +99,41 @@ export default function LogsPage() {
       error: "bg-red-500",
     }
     return colors[level] || "bg-gray-500"
+  }
+
+  const handleExport = () => {
+    const blob = new Blob([JSON.stringify(filteredLogs, null, 2)], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `openclaw-logs-${new Date().toISOString()}.json`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+  }
+
+  const handleClear = () => {
+    setLogs([])
+  }
+
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-3xl font-bold">Logs</h1>
+          <p className="text-muted-foreground">View and search agent logs</p>
+        </div>
+        <Card>
+          <CardHeader>
+            <Skeleton className="h-10 w-full" />
+          </CardHeader>
+          <CardContent>
+            <Skeleton className="h-[600px]" />
+          </CardContent>
+        </Card>
+      </div>
+    )
   }
 
   return (
@@ -92,41 +177,64 @@ export default function LogsPage() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Agents</SelectItem>
-                  <SelectItem value="main">Main</SelectItem>
-                  <SelectItem value="dev">Dev</SelectItem>
-                  <SelectItem value="admin">Admin</SelectItem>
-                  <SelectItem value="reportes">Reportes</SelectItem>
+                  {agents.map((agent) => (
+                    <SelectItem key={agent.id} value={agent.id}>
+                      <span className="flex items-center gap-2">
+                        <span>{agent.emoji}</span>
+                        {agent.name}
+                      </span>
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
 
-              <Button variant="outline" size="icon">
+              <Button variant="outline" size="icon" onClick={handleExport}>
                 <Download className="h-4 w-4" />
               </Button>
-              <Button variant="outline" size="icon">
+              <Button variant="outline" size="icon" onClick={handleClear}>
                 <Trash2 className="h-4 w-4" />
               </Button>
             </div>
           </div>
+          <div className="flex items-center gap-2 mt-4">
+            <Badge variant={gatewayStatus === 'connected' ? 'default' : 'secondary'}>
+              {gatewayStatus === 'connected' ? 'Live' : 'Disconnected'}
+            </Badge>
+            <span className="text-sm text-muted-foreground">
+              {filteredLogs.length} logs
+            </span>
+          </div>
         </CardHeader>
         <CardContent>
-          <ScrollArea className="h-[600px]">
+          <ScrollArea ref={scrollRef} className="h-[600px]">
             <div className="space-y-2">
-              {filteredLogs.map((log) => (
-                <div
-                  key={log.id}
-                  className="flex items-start gap-4 p-3 rounded-lg hover:bg-muted transition-colors"
-                >
-                  <Badge className={`${getLevelColor(log.level)} text-white`}>
-                    {log.level.toUpperCase()}
-                  </Badge>
-                  <div className="flex-1">
-                    <p className="font-medium">{log.message}</p>
-                    <p className="text-sm text-muted-foreground">
-                      {formatDate(log.timestamp)} • {log.agentId}
-                    </p>
-                  </div>
+              {filteredLogs.length === 0 ? (
+                <div className="text-center py-12 text-muted-foreground">
+                  No logs found
                 </div>
-              ))}
+              ) : (
+                filteredLogs.map((log) => (
+                  <div
+                    key={log.id}
+                    className="flex items-start gap-4 p-3 rounded-lg hover:bg-muted transition-colors"
+                  >
+                    <Badge className={`${getLevelColor(log.level)} text-white shrink-0`}>
+                      {log.level.toUpperCase()}
+                    </Badge>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium break-words">{log.message}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {formatDate(log.timestamp)}
+                        {log.agentId && (
+                          <span className="ml-2">
+                            • {agents.find(a => a.id === log.agentId)?.name || log.agentId}
+                          </span>
+                        )}
+                      </p>
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
           </ScrollArea>
         </CardContent>
