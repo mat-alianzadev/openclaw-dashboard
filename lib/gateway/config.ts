@@ -9,6 +9,7 @@ export const GATEWAY_CONFIG = {
 export interface GatewayAgent {
   id: string
   name: string
+  emoji: string
   workspace: string
   status?: 'idle' | 'busy' | 'offline' | 'error'
   model?: string

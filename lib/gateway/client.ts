@@ -103,18 +103,18 @@ class GatewayClient {
   private async getAgentsFromConfig(): Promise<GatewayAgent[]> {
     // These match the agents defined in openclaw.json
     return [
-      { id: 'main', name: 'Main', workspace: 'workspace', status: 'idle', model: 'openrouter/moonshotai/kimi-k2.5' },
-      { id: 'dev', name: 'Dev', workspace: 'workspace-dev', status: 'busy', model: 'openrouter/anthropic/claude-sonnet-4.5' },
-      { id: 'admin', name: 'Admin', workspace: 'workspace-admin', status: 'idle', model: 'openrouter/moonshotai/kimi-k2.5' },
-      { id: 'reportes', name: 'Reportes', workspace: 'workspace-reportes', status: 'offline', model: 'openrouter/moonshotai/kimi-k2.5' },
-      { id: 'briefing', name: 'Briefing', workspace: 'workspace', status: 'idle' },
-      { id: 'scout', name: 'Scout', workspace: 'workspace', status: 'idle' },
-      { id: 'ventas', name: 'Ventas', workspace: 'workspace', status: 'idle' },
-      { id: 'content', name: 'Content', workspace: 'workspace', status: 'idle' },
-      { id: 'seo', name: 'SEO', workspace: 'workspace', status: 'idle' },
-      { id: 'bidding', name: 'Bidding', workspace: 'workspace', status: 'idle' },
-      { id: 'finanzas', name: 'Finanzas', workspace: 'workspace', status: 'idle' },
-      { id: 'builder', name: 'Builder', workspace: 'workspace', status: 'idle' },
+      { id: 'main', name: 'Main', emoji: '🧠', workspace: 'workspace', status: 'idle', model: 'openrouter/moonshotai/kimi-k2.5' },
+      { id: 'dev', name: 'Dev', emoji: '🔧', workspace: 'workspace-dev', status: 'busy', model: 'openrouter/anthropic/claude-sonnet-4.5' },
+      { id: 'admin', name: 'Admin', emoji: '🖥️', workspace: 'workspace-admin', status: 'idle', model: 'openrouter/moonshotai/kimi-k2.5' },
+      { id: 'reportes', name: 'Reportes', emoji: '📋', workspace: 'workspace-reportes', status: 'offline', model: 'openrouter/moonshotai/kimi-k2.5' },
+      { id: 'briefing', name: 'Briefing', emoji: '☀️', workspace: 'workspace', status: 'idle' },
+      { id: 'scout', name: 'Scout', emoji: '🔍', workspace: 'workspace', status: 'idle' },
+      { id: 'ventas', name: 'Ventas', emoji: '💰', workspace: 'workspace', status: 'idle' },
+      { id: 'content', name: 'Content', emoji: '✍️', workspace: 'workspace', status: 'idle' },
+      { id: 'seo', name: 'SEO', emoji: '🎯', workspace: 'workspace', status: 'idle' },
+      { id: 'bidding', name: 'Bidding', emoji: '📝', workspace: 'workspace', status: 'idle' },
+      { id: 'finanzas', name: 'Finanzas', emoji: '💵', workspace: 'workspace', status: 'idle' },
+      { id: 'builder', name: 'Builder', emoji: '🏗️', workspace: 'workspace', status: 'idle' },
     ]
   }
 }

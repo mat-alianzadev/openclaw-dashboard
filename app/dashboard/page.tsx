@@ -35,7 +35,7 @@ async function StatsSection() {
       title: "Gateway Status",
       icon: Activity,
       value: status.gatewayOnline ? "Online" : "Offline",
-      variant: status.gatewayOnline ? "default" : "destructive" as const,
+      variant: (status.gatewayOnline ? "default" : "destructive") as "default" | "destructive",
     },
     {
       title: "Connected Agents",
