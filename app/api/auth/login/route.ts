@@ -29,8 +29,8 @@ export async function POST(req: NextRequest) {
         name: "token",
         value: token,
         httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        sameSite: "strict",
+        secure: false, // Disabled for internal network HTTP access
+        sameSite: "lax",
         maxAge: 86400, // 24 hours
         path: "/",
       })
