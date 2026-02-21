@@ -1,58 +1,192 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback, useMemo } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Activity, Terminal, Settings } from "lucide-react"
+import { Activity, Terminal, Settings, Loader2 } from "lucide-react"
 import { formatRelativeTime } from "@/lib/utils"
 import { Agent } from "@/lib/types"
+import { useGateway } from "@/lib/gateway/useGateway"
+import { Skeleton } from "@/components/ui/skeleton"
 
-const mockAgents: Agent[] = [
-  { id: "main", name: "Main", emoji: "🧠", status: "idle", lastActivity: new Date(), workspace: "workspace", model: "openrouter/moonshotai/kimi-k2.5" },
-  { id: "dev", name: "Dev", emoji: "🔧", status: "busy", currentTask: "Reviewing React component performance", lastActivity: new Date(), workspace: "workspace-dev", model: "openrouter/anthropic/claude-sonnet-4.5" },
-  { id: "admin", name: "Admin", emoji: "🖥️", status: "idle", lastActivity: new Date(Date.now() - 3600000), workspace: "workspace-admin", model: "openrouter/moonshotai/kimi-k2.5" },
-  { id: "reportes", name: "Reportes", emoji: "📋", status: "offline", lastActivity: new Date(Date.now() - 86400000), workspace: "workspace-reportes", model: "openrouter/moonshotai/kimi-k2.5" },
-  { id: "briefing", name: "Briefing", emoji: "☀️", status: "idle", lastActivity: new Date(Date.now() - 7200000), workspace: "workspace", model: "openrouter/moonshotai/kimi-k2.5" },
-  { id: "scout", name: "Scout", emoji: "🔍", status: "idle", lastActivity: new Date(Date.now() - 10800000), workspace: "workspace", model: "openrouter/moonshotai/kimi-k2.5" },
-]
+// Memoized agent list item to prevent unnecessary re-renders
+function AgentListItem({
+  agent,
+  isSelected,
+  onClick,
+}: {
+  agent: Agent
+  isSelected: boolean
+  onClick: () => void
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={`w-full flex items-center gap-3 rounded-lg p-3 text-left transition-colors ${
+        isSelected
+          ? "bg-primary text-primary-foreground"
+          : "hover:bg-accent"
+      }`}
+    >
+      <span className="text-2xl">{agent.emoji}</span>
+      <div className="flex-1 min-w-0">
+        <p className="font-medium truncate">{agent.name}</p>
+        <p className="text-xs opacity-70 truncate">{agent.workspace}</p>
+      </div>
+      <Badge
+        className={`
+          ${agent.status === "idle" && "bg-green-500"}
+          ${agent.status === "busy" && "bg-yellow-500"}
+          ${agent.status === "offline" && "bg-gray-500"}
+          ${agent.status === "error" && "bg-red-500"}
+          shrink-0
+        `}
+      >
+        {agent.status}
+      </Badge>
+    </button>
+  )
+}
 
-const mockOutput: Record<string, string[]> = {
-  dev: [
-    "Analyzing component structure...",
-    "Found 3 potential performance issues",
-    "✅ Fixed: Removed unnecessary re-renders",
-    "✅ Fixed: Added React.memo() to heavy components",
-    "✅ Fixed: Implemented lazy loading",
-    "Code review completed successfully",
-  ],
-  admin: [
-    "Connecting to server 192.168.1.75...",
-    "Checking Docker containers...",
-    "Found 1 container to restart: dokploy-traefik",
-    "Restarting container...",
-    "✅ Container restarted successfully",
-    "Status: Up 3 seconds",
-  ],
+// Memoized agent list to prevent re-renders when parent updates
+const AgentList = React.memo(function AgentList({
+  agents,
+  selectedId,
+  onSelect,
+}: {
+  agents: Agent[]
+  selectedId: string | null
+  onSelect: (agent: Agent) => void
+}) {
+  return (
+    <ScrollArea className="h-[600px]">
+      <div className="space-y-2">
+        {agents.map((agent) => (
+          <AgentListItem
+            key={agent.id}
+            agent={agent}
+            isSelected={selectedId === agent.id}
+            onClick={() => onSelect(agent)}
+          />
+        ))}
+      </div>
+    </ScrollArea>
+  )
+})
+
+// Loading skeleton for agent list
+function AgentListSkeleton() {
+  return (
+    <div className="space-y-2">
+      {[...Array(6)].map((_, i) => (
+        <div key={i} className="flex items-center gap-3 rounded-lg p-3">
+          <Skeleton className="h-8 w-8 rounded-full" />
+          <div className="flex-1 space-y-1">
+            <Skeleton className="h-4 w-[100px]" />
+            <Skeleton className="h-3 w-[150px]" />
+          </div>
+          <Skeleton className="h-6 w-[60px]" />
+        </div>
+      ))}
+    </div>
+  )
+}
+
+// Output viewer component
+function OutputViewer({ agentId }: { agentId: string }) {
+  const [output, setOutput] = useState<string[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    // In production, this would fetch real output from Gateway
+    setLoading(true)
+    const mockOutput: Record<string, string[]> = {
+      dev: [
+        "Analyzing component structure...",
+        "Found 3 potential performance issues",
+        "✅ Fixed: Removed unnecessary re-renders",
+        "✅ Fixed: Added React.memo() to heavy components",
+        "✅ Fixed: Implemented lazy loading",
+        "Code review completed successfully",
+      ],
+      admin: [
+        "Connecting to server 192.168.1.75...",
+        "Checking Docker containers...",
+        "Found 1 container to restart: dokploy-traefik",
+        "Restarting container...",
+        "✅ Container restarted successfully",
+        "Status: Up 3 seconds",
+      ],
+    }
+    
+    // Simulate async fetch
+    const timer = setTimeout(() => {
+      setOutput(mockOutput[agentId] || ["No recent output available"])
+      setLoading(false)
+    }, 500)
+
+    return () => clearTimeout(timer)
+  }, [agentId])
+
+  if (loading) {
+    return (
+      <div className="h-[400px] flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin" />
+      </div>
+    )
+  }
+
+  return (
+    <ScrollArea className="h-[400px] rounded-md border bg-black p-4">
+      <div className="font-mono text-sm text-green-400">
+        {output.map((line, i) => (
+          <div key={i} className="py-1">
+            <span className="text-gray-500">[{new Date().toLocaleTimeString()}]</span> {line}
+          </div>
+        ))}
+      </div>
+    </ScrollArea>
+  )
 }
 
 export default function AgentsPage() {
-  const [selectedAgent, setSelectedAgent] = useState<Agent | null>(mockAgents[0])
-  const [agents, setAgents] = useState<Agent[]>(mockAgents)
+  const [selectedAgent, setSelectedAgent] = useState<Agent | null>(null)
+  const [agents, setAgents] = useState<Agent[]>([])
+  const [loading, setLoading] = useState(true)
+  const { status: gatewayStatus } = useGateway()
 
+  // Fetch agents on mount
   useEffect(() => {
-    // Simulate real-time updates
-    const interval = setInterval(() => {
-      setAgents(prev => prev.map(agent => ({
-        ...agent,
-        lastActivity: agent.status === "busy" ? new Date() : agent.lastActivity
-      })))
-    }, 30000)
+    async function fetchAgents() {
+      try {
+        const res = await fetch("/api/agents")
+        if (res.ok) {
+          const data = await res.json()
+          setAgents(data)
+          if (data.length > 0 && !selectedAgent) {
+            setSelectedAgent(data[0])
+          }
+        }
+      } catch (err) {
+        console.error("Failed to fetch agents:", err)
+      } finally {
+        setLoading(false)
+      }
+    }
 
-    return () => clearInterval(interval)
+    fetchAgents()
   }, [])
+
+  // Memoized callback for agent selection to prevent unnecessary re-renders
+  const handleSelectAgent = useCallback((agent: Agent) => {
+    setSelectedAgent(agent)
+  }, [])
+
+  // Memoized selected agent ID for comparison
+  const selectedId = useMemo(() => selectedAgent?.id ?? null, [selectedAgent])
 
   return (
     <div className="space-y-6">
@@ -69,42 +203,20 @@ export default function AgentsPage() {
             <CardDescription>Select an agent to view details</CardDescription>
           </CardHeader>
           <CardContent>
-            <ScrollArea className="h-[600px]">
-              <div className="space-y-2">
-                {agents.map((agent) => (
-                  <button
-                    key={agent.id}
-                    onClick={() => setSelectedAgent(agent)}
-                    className={`w-full flex items-center gap-3 rounded-lg p-3 text-left transition-colors ${
-                      selectedAgent?.id === agent.id
-                        ? "bg-primary text-primary-foreground"
-                        : "hover:bg-accent"
-                    }`}
-                  >
-                    <span className="text-2xl">{agent.emoji}</span>
-                    <div className="flex-1">
-                      <p className="font-medium">{agent.name}</p>
-                      <p className="text-xs opacity-70">{agent.workspace}</p>
-                    </div>
-                    <Badge
-                      className={`
-                        ${agent.status === "idle" && "bg-green-500"}
-                        ${agent.status === "busy" && "bg-yellow-500"}
-                        ${agent.status === "offline" && "bg-gray-500"}
-                        ${agent.status === "error" && "bg-red-500"}
-                      `}
-                    >
-                      {agent.status}
-                    </Badge>
-                  </button>
-                ))}
-              </div>
-            </ScrollArea>
+            {loading ? (
+              <AgentListSkeleton />
+            ) : (
+              <AgentList
+                agents={agents}
+                selectedId={selectedId}
+                onSelect={handleSelectAgent}
+              />
+            )}
           </CardContent>
         </Card>
 
         {/* Agent Details */}
-        {selectedAgent && (
+        {selectedAgent ? (
           <Card className="lg:col-span-2">
             <CardHeader>
               <div className="flex items-center justify-between">
@@ -158,7 +270,7 @@ export default function AgentsPage() {
                     </div>
                     <div>
                       <p className="text-sm text-muted-foreground">Last Activity</p>
-                      <p className="font-medium">{formatRelativeTime(selectedAgent.lastActivity)}</p>
+                      <p className="font-medium">{formatRelativeTime(selectedAgent.lastActivity || new Date())}</p>
                     </div>
                   </div>
 
@@ -171,17 +283,7 @@ export default function AgentsPage() {
                 </TabsContent>
 
                 <TabsContent value="output">
-                  <ScrollArea className="h-[400px] rounded-md border bg-black p-4">
-                    <div className="font-mono text-sm text-green-400">
-                      {mockOutput[selectedAgent.id]?.map((line, i) => (
-                        <div key={i} className="py-1">
-                          <span className="text-gray-500">[{new Date().toLocaleTimeString()}]</span> {line}
-                        </div>
-                      )) || (
-                        <div className="text-gray-500">No recent output</div>
-                      )}
-                    </div>
-                  </ScrollArea>
+                  <OutputViewer agentId={selectedAgent.id} />
                 </TabsContent>
 
                 <TabsContent value="logs">
@@ -198,8 +300,14 @@ export default function AgentsPage() {
               </Tabs>
             </CardContent>
           </Card>
+        ) : (
+          <Card className="lg:col-span-2 flex items-center justify-center h-[400px]">
+            <p className="text-muted-foreground">Select an agent to view details</p>
+          </Card>
         )}
       </div>
     </div>
   )
 }
+
+import React from "react"
