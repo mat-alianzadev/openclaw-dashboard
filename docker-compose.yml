@@ -1,0 +1,26 @@
+version: '3.8'
+
+services:
+  openclaw-dashboard:
+    image: openclaw-dashboard:latest
+    container_name: openclaw-dashboard
+    restart: unless-stopped
+    ports:
+      - "3001:3000"
+    environment:
+      - JWT_SECRET=${JWT_SECRET:-openclaw-dashboard-secret}
+      - OPENCLAW_GATEWAY_URL=ws://host.docker.internal:18789
+      - OPENCLAW_REST_URL=http://host.docker.internal:18789
+      - OPENCLAW_GATEWAY_TOKEN=${OPENCLAW_GATEWAY_TOKEN}
+      - NEXT_PUBLIC_APP_URL=${NEXT_PUBLIC_APP_URL:-http://localhost:3001}
+    networks:
+      - dokploy-network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.openclaw-dashboard.rule=Host(`openclaw-dashboard.local`)"
+      - "traefik.http.routers.openclaw-dashboard.entrypoints=web"
+      - "traefik.http.services.openclaw-dashboard.loadbalancer.server.port=3000"
+
+networks:
+  dokploy-network:
+    external: true
