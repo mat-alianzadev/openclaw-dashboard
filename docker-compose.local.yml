@@ -1,0 +1,22 @@
+version: '3.8'
+
+services:
+  openclaw-dashboard:
+    image: ghcr.io/mat-alianzadev/openclaw-dashboard:latest
+    container_name: openclaw-dashboard
+    restart: unless-stopped
+    # Puerto expuesto SOLO en la red interna (192.168.1.75)
+    ports:
+      - "192.168.1.75:3001:3000"
+    environment:
+      - JWT_SECRET=${JWT_SECRET:-openclaw-dashboard-secret}
+      - OPENCLAW_GATEWAY_URL=ws://192.168.1.75:18789
+      - OPENCLAW_REST_URL=http://192.168.1.75:18789
+      - OPENCLAW_GATEWAY_TOKEN=${OPENCLAW_GATEWAY_TOKEN}
+      - NEXT_PUBLIC_APP_URL=http://192.168.1.75:3001
+    networks:
+      - dokploy-network
+
+networks:
+  dokploy-network:
+    external: true
