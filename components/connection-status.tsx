@@ -1,12 +1,13 @@
 'use client'
 
-import { useGateway } from '@/lib/gateway/useGateway'
+import { useGatewayStore } from '@/lib/gateway/store'
 import { Badge } from '@/components/ui/badge'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { Wifi, WifiOff, Loader2 } from 'lucide-react'
 
 export function ConnectionStatus() {
-  const { status, isConnected } = useGateway()
+  const status = useGatewayStore((state) => state.status)
+  const isConnected = status === 'connected'
 
   const getIcon = () => {
     switch (status) {

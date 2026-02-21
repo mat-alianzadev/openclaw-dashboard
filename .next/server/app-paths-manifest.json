@@ -1,1 +1,17 @@
-{}
+{
+  "/_not-found/page": "app/_not-found/page.js",
+  "/api/agents/[id]/status/route": "app/api/agents/[id]/status/route.js",
+  "/api/agents/route": "app/api/agents/route.js",
+  "/api/auth/login/route": "app/api/auth/login/route.js",
+  "/api/chat/route": "app/api/chat/route.js",
+  "/api/auth/logout/route": "app/api/auth/logout/route.js",
+  "/api/logs/route": "app/api/logs/route.js",
+  "/api/status/route": "app/api/status/route.js",
+  "/login/page": "app/login/page.js",
+  "/page": "app/page.js",
+  "/dashboard/tasks/page": "app/dashboard/tasks/page.js",
+  "/dashboard/agents/page": "app/dashboard/agents/page.js",
+  "/dashboard/logs/page": "app/dashboard/logs/page.js",
+  "/dashboard/chat/page": "app/dashboard/chat/page.js",
+  "/dashboard/page": "app/dashboard/page.js"
+}
