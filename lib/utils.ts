@@ -37,14 +37,13 @@ export function getStatusColor(status: string): string {
     busy: 'bg-yellow-500',
     offline: 'bg-gray-500',
     error: 'bg-red-500',
-    'backlog': 'bg-gray-500',
+    backlog: 'bg-gray-500',
     'in-progress': 'bg-blue-500',
-    'review': 'bg-purple-500',
-    'done': 'bg-green-500',
+    review: 'bg-purple-500',
+    done: 'bg-green-500',
     debug: 'bg-gray-400',
     info: 'bg-blue-500',
     warn: 'bg-yellow-500',
-    error: 'bg-red-500',
   }
   return colors[status] || 'bg-gray-500'
 }
