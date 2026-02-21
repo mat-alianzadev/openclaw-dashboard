@@ -1,12 +1,17 @@
 import { Suspense } from "react"
+import type { Metadata } from "next"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Activity, CheckCircle, Clock, Users } from "lucide-react"
-import { formatRelativeTime } from "@/lib/utils"
-import { SystemStatus, Agent, AgentActivity } from "@/lib/types"
+import { formatRelativeTime, getStatusColorClass } from "@/lib/utils"
 import { gatewayClient } from "@/lib/gateway/client"
 import { ErrorBoundary } from "@/components/error-boundary"
 import { Skeleton } from "@/components/ui/skeleton"
+
+export const metadata: Metadata = {
+  title: "Dashboard - OpenClaw",
+  description: "Overview of your OpenClaw agents and activities",
+}
 
 // Loading skeleton for stats
 function StatsSkeleton() {
@@ -121,18 +126,11 @@ async function AgentListSection() {
             </div>
           </div>
           <div className="flex items-center gap-4">
-            <Badge
-              className={`
-                ${agent.status === "idle" && "bg-green-500"}
-                ${agent.status === "busy" && "bg-yellow-500"}
-                ${agent.status === "offline" && "bg-gray-500"}
-                ${agent.status === "error" && "bg-red-500"}
-              `}
-            >
+            <Badge className={getStatusColorClass(agent.status || 'offline')}>
               {agent.status}
             </Badge>
             <span className="text-sm text-muted-foreground">
-              {formatRelativeTime(agent.lastActivity || new Date())}
+              {formatRelativeTime(agent.lastActivity || new Date().toISOString())}
             </span>
           </div>
         </div>

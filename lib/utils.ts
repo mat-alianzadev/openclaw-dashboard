@@ -1,12 +1,13 @@
 import { type ClassValue, clsx } from "clsx"
 import { twMerge } from "tailwind-merge"
+import { cva, type VariantProps } from "class-variance-authority"
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
-export function formatDate(date: Date | string): string {
-  const d = new Date(date)
+export function formatDate(date: string | Date): string {
+  const d = typeof date === 'string' ? new Date(date) : date
   return d.toLocaleString('en-US', {
     month: 'short',
     day: 'numeric',
@@ -15,9 +16,9 @@ export function formatDate(date: Date | string): string {
   })
 }
 
-export function formatRelativeTime(date: Date | string): string {
+export function formatRelativeTime(date: string | Date): string {
   const now = new Date()
-  const d = new Date(date)
+  const d = typeof date === 'string' ? new Date(date) : date
   const diff = now.getTime() - d.getTime()
   
   const seconds = Math.floor(diff / 1000)
@@ -56,4 +57,38 @@ export function getPriorityColor(priority: string): string {
     critical: 'bg-red-100 text-red-800',
   }
   return colors[priority] || 'bg-gray-100 text-gray-800'
+}
+
+// Status badge variants using cva
+export const statusBadgeVariants = cva("", {
+  variants: {
+    status: {
+      idle: "bg-green-500 hover:bg-green-600",
+      busy: "bg-yellow-500 hover:bg-yellow-600",
+      offline: "bg-gray-500 hover:bg-gray-600",
+      error: "bg-red-500 hover:bg-red-600",
+      backlog: "bg-gray-500 hover:bg-gray-600",
+      "in-progress": "bg-blue-500 hover:bg-blue-600",
+      review: "bg-purple-500 hover:bg-purple-600",
+      done: "bg-green-500 hover:bg-green-600",
+    },
+  },
+  defaultVariants: {
+    status: "offline",
+  },
+})
+
+// Helper function to get full status color classes for badges
+export function getStatusColorClass(status: string): string {
+  const classes: Record<string, string> = {
+    idle: "bg-green-500",
+    busy: "bg-yellow-500",
+    offline: "bg-gray-500",
+    error: "bg-red-500",
+    backlog: "bg-gray-500",
+    "in-progress": "bg-blue-500",
+    review: "bg-purple-500",
+    done: "bg-green-500",
+  }
+  return classes[status] || "bg-gray-500"
 }

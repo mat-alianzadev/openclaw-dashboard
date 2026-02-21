@@ -1,9 +1,8 @@
 'use client'
 
 import { useEffect, useRef, useState, useCallback } from 'react'
-import { GATEWAY_CONFIG, GatewayMessage } from './config'
-
-export type ConnectionStatus = 'connecting' | 'connected' | 'disconnected' | 'error'
+import { GatewayMessage } from './config'
+import { useGatewayStore, ConnectionStatus, initGateway } from './store'
 
 interface UseGatewayOptions {
   onMessage?: (message: GatewayMessage) => void
@@ -14,84 +13,64 @@ interface UseGatewayOptions {
 
 export function useGateway(options: UseGatewayOptions = {}) {
   const [status, setStatus] = useState<ConnectionStatus>('disconnected')
-  const wsRef = useRef<WebSocket | null>(null)
-  const reconnectTimeoutRef = useRef<NodeJS.Timeout>()
-  const { onMessage, onConnect, onDisconnect, onError } = options
+  const callbacksRef = useRef(options)
+  
+  // Keep callbacks up to date without triggering re-renders
+  callbacksRef.current = options
 
-  const connect = useCallback(() => {
-    if (wsRef.current?.readyState === WebSocket.OPEN) return
+  // Get store state and actions
+  const { connect, disconnect, sendMessage } = useGatewayStore()
 
-    setStatus('connecting')
-
-    try {
-      const ws = new WebSocket(GATEWAY_CONFIG.url)
-      
-      ws.onopen = () => {
-        setStatus('connected')
-        // Authenticate with Gateway
-        ws.send(JSON.stringify({
-          type: 'auth',
-          token: GATEWAY_CONFIG.token
-        }))
-        onConnect?.()
-      }
-
-      ws.onmessage = (event) => {
-        try {
-          const message: GatewayMessage = JSON.parse(event.data)
-          onMessage?.(message)
-        } catch (err) {
-          console.error('Failed to parse Gateway message:', err)
-        }
-      }
-
-      ws.onclose = () => {
-        setStatus('disconnected')
-        onDisconnect?.()
-        // Auto-reconnect after 5 seconds
-        reconnectTimeoutRef.current = setTimeout(() => {
-          connect()
-        }, 5000)
-      }
-
-      ws.onerror = (error) => {
-        setStatus('error')
-        onError?.(new Error('WebSocket error'))
-      }
-
-      wsRef.current = ws
-    } catch (err) {
-      setStatus('error')
-      onError?.(err as Error)
-    }
-  }, [onMessage, onConnect, onDisconnect, onError])
-
-  const disconnect = useCallback(() => {
-    if (reconnectTimeoutRef.current) {
-      clearTimeout(reconnectTimeoutRef.current)
-    }
-    wsRef.current?.close()
-    wsRef.current = null
-    setStatus('disconnected')
-  }, [])
-
-  const sendMessage = useCallback((message: unknown) => {
-    if (wsRef.current?.readyState === WebSocket.OPEN) {
-      wsRef.current.send(JSON.stringify(message))
-      return true
-    }
-    return false
-  }, [])
-
+  // Subscribe to store status changes
   useEffect(() => {
+    const unsubscribe = useGatewayStore.subscribe(
+      (state) => state.status,
+      (newStatus) => {
+        setStatus(newStatus)
+      }
+    )
+    
+    // Set initial status
+    setStatus(useGatewayStore.getState().status)
+    
+    return unsubscribe
+  }, [])
+
+  // Subscribe to gateway events with stable callbacks
+  useEffect(() => {
+    const id = Math.random().toString(36).slice(2)
+    
+    const unsubscribe = useGatewayStore.getState().subscribe(id, {
+      onMessage: (message) => {
+        callbacksRef.current.onMessage?.(message)
+      },
+      onConnect: () => {
+        callbacksRef.current.onConnect?.()
+      },
+      onDisconnect: () => {
+        callbacksRef.current.onDisconnect?.()
+      },
+      onError: (error) => {
+        callbacksRef.current.onError?.(error)
+      },
+    })
+
+    // Initialize connection on first mount
+    initGateway()
+
+    return unsubscribe
+  }, [])
+
+  const reconnect = useCallback(() => {
+    disconnect()
     connect()
-    return () => disconnect()
   }, [connect, disconnect])
 
   return {
     status,
     connect,
     disconnect,
+    reconnect,
     sendMessage,
     isConnected: status === 'connected'
   }
@@ -101,19 +80,29 @@ export function useGateway(options: UseGatewayOptions = {}) {
 export function useAgentStatus() {
   const [agents, setAgents] = useState<Record<string, { status: string; lastActivity: Date }>>({})
   
-  const { isConnected } = useGateway({
-    onMessage: (message) => {
-      if (message.type === 'agent_status' && message.agentId) {
-        setAgents(prev => ({
-          ...prev,
-          [message.agentId!]: {
-            status: (message.data as { status: string }).status || 'unknown',
-            lastActivity: new Date()
-          }
-        }))
+  useEffect(() => {
+    const id = Math.random().toString(36).slice(2)
+    
+    const unsubscribe = useGatewayStore.getState().subscribe(id, {
+      onMessage: (message) => {
+        if (message.type === 'agent_status' && message.agentId) {
+          setAgents(prev => ({
+            ...prev,
+            [message.agentId!]: {
+              status: (message.data as { status: string }).status || 'unknown',
+              lastActivity: new Date()
+            }
+          }))
+        }
       }
-    }
-  })
+    })
+
+    initGateway()
+    
+    return unsubscribe
+  }, [])
+
+  const isConnected = useGatewayStore((state) => state.status === 'connected')
 
   return { agents, isConnected }
 }
@@ -128,25 +117,29 @@ export function useChat(agentId: string) {
   }>>([])
   const [isLoading, setIsLoading] = useState(false)
 
-  const { sendMessage, isConnected } = useGateway({
-    onMessage: (message) => {
-      if (message.type === 'chat' && message.agentId === agentId) {
-        setMessages(prev => [...prev, {
-          id: Date.now().toString(),
-          role: 'assistant',
-          content: (message.data as { content: string }).content,
-          timestamp: new Date()
-        }])
-        setIsLoading(false)
+  useEffect(() => {
+    const id = Math.random().toString(36).slice(2)
+    
+    const unsubscribe = useGatewayStore.getState().subscribe(id, {
+      onMessage: (message) => {
+        if (message.type === 'chat' && message.agentId === agentId) {
+          setMessages(prev => [...prev, {
+            id: Date.now().toString(),
+            role: 'assistant',
+            content: (message.data as { content: string }).content,
+            timestamp: new Date()
+          }])
+          setIsLoading(false)
+        }
       }
-    }
-  })
+    })
+
+    initGateway()
+    
+    return unsubscribe
+  }, [agentId])
 
   const sendChatMessage = useCallback(async (content: string) => {
-    if (!isConnected) {
-      throw new Error('Not connected to Gateway')
-    }
-
     // Add user message
     const userMessage = {
       id: Date.now().toString(),
@@ -158,12 +151,19 @@ export function useChat(agentId: string) {
     setIsLoading(true)
 
     // Send to Gateway
-    sendMessage({
+    const sent = useGatewayStore.getState().sendMessage({
       type: 'chat',
       agentId,
       content
     })
-  }, [agentId, isConnected, sendMessage])
+
+    if (!sent) {
+      setIsLoading(false)
+      throw new Error('Not connected to Gateway')
+    }
+  }, [agentId])
+
+  const isConnected = useGatewayStore((state) => state.status === 'connected')
 
   return {
     messages,
